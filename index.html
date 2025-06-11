@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>베이지안 암호화폐 가격 예측 대시보드</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+    <div class="min-h-screen p-6">
+        <div class="max-w-7xl mx-auto">
+            <!-- 헤더 -->
+            <div class="mb-8">
+                <h1 class="text-4xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600">
+                    베이지안 암호화폐 가격 예측 대시보드
+                </h1>
+                <div class="flex items-center gap-4">
+                    <p class="text-gray-400">Binance 실시간 데이터 기반 예측</p>
+                    <div class="flex items-center gap-2 text-sm text-gray-500">
+                        <span>마지막 업데이트: </span>
+                        <span id="lastUpdate">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 에러 메시지 -->
+            <div id="errorMessage" class="mb-6 bg-red-900 bg-opacity-20 border border-red-500 rounded-lg p-4 hidden">
+                <span class="text-red-400"></span>
+            </div>
+
+            <!-- 암호화폐 선택 -->
+            <div class="flex gap-4 mb-6">
+                <button onclick="selectCrypto('BTCUSDT')" id="btnBTC" 
+                    class="px-6 py-3 rounded-lg font-semibold transition-all bg-orange-500 text-white shadow-lg shadow-orange-500/50">
+                    비트코인 (BTC/USDT)
+                </button>
+                <button onclick="selectCrypto('ETHUSDT')" id="btnETH"
+                    class="px-6 py-3 rounded-lg font-semibold transition-all bg-gray-800 text-gray-400 hover:bg-gray-700">
+                    이더리움 (ETH/USDT)
+                </button>
+            </div>
+
+            <!-- 로딩 -->
+            <div id="loading" class="flex items-center justify-center h-64">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400"></div>
+            </div>
+
+            <!-- 메인 컨텐츠 -->
+            <div id="mainContent" class="hidden">
+                <!-- 정보 카드들 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <!-- 현재 가격 -->
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-400">현재 가격 (실시간)</h3>
+                            <span class="text-2xl">💲</span>
+                        </div>
+                        <p class="text-3xl font-bold" id="currentPrice">-</p>
+                        <p class="text-sm text-gray-500 mt-2">Binance <span id="cryptoSymbol">BTC</span>/USDT</p>
+                    </div>
+
+                    <!-- 예측 가격 -->
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-xl border-2 border-blue-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-400">내일 예측 가격</h3>
+                            <span class="text-2xl" id="trendIcon">📈</span>
+                        </div>
+                        <p class="text-3xl font-bold text-blue-400" id="predictedPrice">-</p>
+                        <div class="flex items-center gap-2 mt-2">
+                            <span class="text-sm font-semibold" id="priceChange">-</span>
+                            <span class="text-sm text-gray-500">신뢰도: <span id="confidence">-</span>%</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2" id="priceRange">-</p>
+                    </div>
+
+                    <!-- 시장 상태 -->
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-400">시장 상태</h3>
+                            <span class="text-2xl">📊</span>
+                        </div>
+                        <p class="text-3xl font-bold" id="marketTrend">-</p>
+                        <p class="text-sm text-gray-500 mt-2" id="rsiStatus">RSI: -</p>
+                    </div>
+                </div>
+
+                <!-- 오늘의 시간대별 예측 -->
+                <div class="bg-gray-800 rounded-xl p-6 shadow-xl mb-8">
+                    <h3 class="text-xl font-semibold mb-6">오늘의 시간대별 평균 예측가</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-gray-700 rounded-lg p-4">
+                            <h4 class="text-sm text-gray-400 mb-2">5분 평균</h4>
+                            <p class="text-xl font-bold" id="avg5m">-</p>
+                            <p class="text-xs mt-1" id="change5m">-</p>
+                        </div>
+                        <div class="bg-gray-700 rounded-lg p-4">
+                            <h4 class="text-sm text-gray-400 mb-2">30분 평균</h4>
+                            <p class="text-xl font-bold" id="avg30m">-</p>
+                            <p class="text-xs mt-1" id="change30m">-</p>
+                        </div>
+                        <div class="bg-gray-700 rounded-lg p-4">
+                            <h4 class="text-sm text-gray-400 mb-2">1시간 평균</h4>
+                            <p class="text-xl font-bold" id="avg1h">-</p>
+                            <p class="text-xs mt-1" id="change1h">-</p>
+                        </div>
+                        <div class="bg-gray-700 rounded-lg p-4">
+                            <h4 class="text-sm text-gray-400 mb-2">4시간 평균</h4>
+                            <p class="text-xl font-bold" id="avg4h">-</p>
+                            <p class="text-xs mt-1" id="change4h">-</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 차트 -->
+                <div class="bg-gray-800 rounded-xl p-6 shadow-xl mb-8">
+                    <h3 class="text-xl font-semibold mb-6">30일 가격 추이 및 예측</h3>
+                    <div style="aspect-ratio: 16/9; width: 100%;">
+                        <canvas id="priceChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 통계 정보 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 수익률 통계 -->
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                        <h3 class="text-lg font-semibold mb-4">수익률 통계 (30일)</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">평균 일일 수익률</span>
+                                <span class="font-semibold" id="meanReturn">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">변동성 (일일)</span>
+                                <span class="font-semibold" id="volatility">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">왜도 (Skewness)</span>
+                                <span class="font-semibold" id="skewness">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">첨도 (Kurtosis)</span>
+                                <span class="font-semibold" id="kurtosis">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 기술적 지표 -->
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                        <h3 class="text-lg font-semibold mb-4">기술적 지표</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">RSI (14일)</span>
+                                <span class="font-semibold" id="rsiValue">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">모멘텀 (5일)</span>
+                                <span class="font-semibold" id="momentum">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">추세 강도</span>
+                                <div class="w-24 bg-gray-700 rounded-full h-2">
+                                    <div id="trendStrength" class="h-2 rounded-full bg-green-400 transition-all" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">시장 상태</span>
+                                <span class="font-semibold" id="marketStatus">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 모델 설명 -->
+                <div class="mt-8 bg-gray-800 rounded-xl p-6 shadow-xl">
+                    <h3 class="text-lg font-semibold mb-4">베이지안 추론 모델</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-400">
+                        <div>
+                            <h4 class="text-white font-semibold mb-2">사전 분포 (Prior)</h4>
+                            <p>Binance 30일 실제 가격 데이터 기반 수익률과 변동성 분포 설정</p>
+                        </div>
+                        <div>
+                            <h4 class="text-white font-semibold mb-2">우도 (Likelihood)</h4>
+                            <p>Student-t 분포로 극단적 가격 변동 모델링, Inverse Gamma로 변동성 추정</p>
+                        </div>
+                        <div>
+                            <h4 class="text-white font-semibold mb-2">사후 분포 (Posterior)</h4>
+                            <p>RSI, 모멘텀 등 실시간 기술적 지표를 결합한 최종 예측 분포 생성</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 전역 변수
+        let selectedCrypto = 'BTCUSDT';
+        let priceData = [];
+        let currentPrice = 0;
+        let chart = null;
+        let ws = null;
+        let intradayPrices = []; // 오늘의 가격 데이터
+        let intradayStartTime = null;
+
+        // Binance API 설정 - 직접 호출 (CORS 허용됨)
+        const BINANCE_API = 'https://api.binance.com/api/v3';
+
+        // 베이지안 파라미터
+        const studentTParams = {
+            BTCUSDT: { df: 3, loc: 0.001, scale: 0.02 },
+            ETHUSDT: { df: 3, loc: 0.0015, scale: 0.025 }
+        };
+
+        const invGammaParams = {
+            BTCUSDT: { shape: 2.5, scale: 0.0004 },
+            ETHUSDT: { shape: 2.5, scale: 0.0006 }
+        };
+
+        // 암호화폐 선택
+        function selectCrypto(symbol) {
+            selectedCrypto = symbol;
+            
+            // 버튼 스타일 업데이트
+            if (symbol === 'BTCUSDT') {
+                document.getElementById('btnBTC').className = 'px-6 py-3 rounded-lg font-semibold transition-all bg-orange-500 text-white shadow-lg shadow-orange-500/50';
+                document.getElementById('btnETH').className = 'px-6 py-3 rounded-lg font-semibold transition-all bg-gray-800 text-gray-400 hover:bg-gray-700';
+                document.getElementById('cryptoSymbol').textContent = 'BTC';
+            } else {
+                document.getElementById('btnETH').className = 'px-6 py-3 rounded-lg font-semibold transition-all bg-blue-500 text-white shadow-lg shadow-blue-500/50';
+                document.getElementById('btnBTC').className = 'px-6 py-3 rounded-lg font-semibold transition-all bg-gray-800 text-gray-400 hover:bg-gray-700';
+                document.getElementById('cryptoSymbol').textContent = 'ETH';
+            }
+            
+            // 데이터 다시 로드
+            loadData();
+        }
+
+        // 과거 데이터 가져오기
+        async function fetchHistoricalData() {
+            try {
+                const endTime = Date.now();
+                const startTime = endTime - (30 * 24 * 60 * 60 * 1000);
+                
+                // Binance API는 CORS를 허용하므로 직접 호출 가능
+                const url = `${BINANCE_API}/klines?symbol=${selectedCrypto}&interval=1d&startTime=${startTime}&endTime=${endTime}&limit=30`;
+                
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`API 호출 실패: ${response.status}`);
+                }
+                
+                const klines = await response.json();
+                
+                return klines.map(kline => {
+                    const date = new Date(kline[0]);
+                    return {
+                        date: date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
+                        price: parseFloat(kline[4]) // close price
+                    };
+                });
+            } catch (err) {
+                console.error('Historical data fetch error:', err);
+                
+                // 대체 방법: CoinGecko API 사용 (CORS 허용)
+                try {
+                    console.log('Binance API 실패, CoinGecko API 시도 중...');
+                    const coinId = selectedCrypto === 'BTCUSDT' ? 'bitcoin' : 'ethereum';
+                    const cgUrl = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=30&interval=daily`;
+                    
+                    const response = await fetch(cgUrl);
+                    if (!response.ok) throw new Error('CoinGecko API 호출 실패');
+                    
+                    const data = await response.json();
+                    return data.prices.map(([timestamp, price]) => {
+                        const date = new Date(timestamp);
+                        return {
+                            date: date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
+                            price: price
+                        };
+                    });
+                } catch (cgErr) {
+                    console.error('CoinGecko API error:', cgErr);
+                    showError('과거 데이터를 가져오는데 실패했습니다. 페이지를 새로고침해주세요.');
+                    return [];
+                }
+            }
+        }
+
+        // 현재 가격 가져오기
+        async function fetchCurrentPrice() {
+            try {
+                // Binance API 직접 호출
+                const url = `${BINANCE_API}/ticker/price?symbol=${selectedCrypto}`;
+                
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('Binance 가격 정보 호출 실패');
+                }
+                
+                const data = await response.json();
+                return parseFloat(data.price);
+            } catch (err) {
+                console.error('Current price fetch error:', err);
+                
+                // 대체: CoinGecko API
+                try {
+                    const coinId = selectedCrypto === 'BTCUSDT' ? 'bitcoin' : 'ethereum';
+                    const cgUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`;
+                    
+                    const response = await fetch(cgUrl);
+                    if (!response.ok) throw new Error('CoinGecko API 실패');
+                    
+                    const data = await response.json();
+                    return data[coinId].usd;
+                } catch (cgErr) {
+                    console.error('CoinGecko price error:', cgErr);
+                    return null;
+                }
+            }
+        }
+
+        // WebSocket 연결
+        function connectWebSocket() {
+            if (ws) ws.close();
+            
+            const wsUrl = `wss://stream.binance.com:9443/ws/${selectedCrypto.toLowerCase()}@ticker`;
+            ws = new WebSocket(wsUrl);
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                currentPrice = parseFloat(data.c);
+                updateCurrentPrice();
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('ko-KR');
+            };
+        }
+
+        // Student-t 분포 샘플링
+        function sampleStudentT(df, loc, scale) {
+            const u1 = Math.random();
+            const u2 = Math.random();
+            const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+            
+            let chi2 = 0;
+            for (let i = 0; i < df; i++) {
+                const n = Math.random();
+                chi2 += Math.pow(Math.sqrt(-2 * Math.log(n)) * Math.cos(2 * Math.PI * Math.random()), 2);
+            }
+            
+            const t = z / Math.sqrt(chi2 / df);
+            return loc + scale * t;
+        }
+
+        // 오늘의 시간대별 데이터 가져오기
+        async function fetchIntradayData(interval) {
+            try {
+                const now = Date.now();
+                let limit;
+                switch(interval) {
+                    case '5m': limit = 12; break; // 1시간치
+                    case '30m': limit = 48; break; // 24시간치
+                    case '1h': limit = 24; break; // 24시간치
+                    case '4h': limit = 6; break; // 24시간치
+                }
+                
+                const url = `${BINANCE_API}/klines?symbol=${selectedCrypto}&interval=${interval}&limit=${limit}`;
+                const response = await fetch(url);
+                
+                if (!response.ok) throw new Error(`Failed to fetch ${interval} data`);
+                
+                const klines = await response.json();
+                return klines.map(k => parseFloat(k[4])); // close prices
+            } catch (err) {
+                console.error(`Intraday ${interval} fetch error:`, err);
+                return [];
+            }
+        }
+
+        // 시간대별 평균 예측 계산
+        async function calculateIntradayPredictions() {
+            const intervals = ['5m', '30m', '1h', '4h'];
+            
+            for (const interval of intervals) {
+                const prices = await fetchIntradayData(interval);
+                if (prices.length > 0) {
+                    // 평균 계산
+                    const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+                    
+                    // 변화율 계산
+                    const change = ((prices[prices.length - 1] - prices[0]) / prices[0] * 100).toFixed(2);
+                    
+                    // 간단한 선형 추세 기반 예측
+                    const trend = (prices[prices.length - 1] - prices[0]) / prices.length;
+                    const predicted = prices[prices.length - 1] + trend;
+                    
+                    // UI 업데이트
+                    updateIntradayUI(interval, predicted, change);
+                }
+            }
+        }
+
+        // 시간대별 예측 UI 업데이트
+        function updateIntradayUI(interval, predicted, change) {
+            let elementId, changeId;
+            switch(interval) {
+                case '5m': 
+                    elementId = 'avg5m'; 
+                    changeId = 'change5m';
+                    break;
+                case '30m': 
+                    elementId = 'avg30m';
+                    changeId = 'change30m';
+                    break;
+                case '1h': 
+                    elementId = 'avg1h';
+                    changeId = 'change1h';
+                    break;
+                case '4h': 
+                    elementId = 'avg4h';
+                    changeId = 'change4h';
+                    break;
+            }
+            
+            document.getElementById(elementId).textContent = 
+                `${predicted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            
+            const changeElement = document.getElementById(changeId);
+            changeElement.textContent = `${change > 0 ? '+' : ''}${change}%`;
+            changeElement.className = `text-xs mt-1 ${change > 0 ? 'text-green-400' : 'text-red-400'}`;
+        }
+
+        // RSI 계산
+        function calculateRSI(prices) {
+            if (prices.length < 14) return 50;
+            
+            const gains = [];
+            const losses = [];
+            
+            for (let i = 1; i < prices.length; i++) {
+                const diff = prices[i] - prices[i-1];
+                if (diff > 0) {
+                    gains.push(diff);
+                    losses.push(0);
+                } else {
+                    gains.push(0);
+                    losses.push(Math.abs(diff));
+                }
+            }
+            
+            const avgGain = gains.slice(-14).reduce((a, b) => a + b, 0) / 14;
+            const avgLoss = losses.slice(-14).reduce((a, b) => a + b, 0) / 14;
+            
+            if (avgLoss === 0) return 100;
+            const rs = avgGain / avgLoss;
+            return 100 - (100 / (1 + rs));
+        }
+
+        // 베이지안 예측
+        function bayesianPredict() {
+            if (priceData.length < 2) return null;
+            
+            const prices = priceData.map(d => d.price);
+            const returns = [];
+            
+            // 수익률 계산
+            for (let i = 1; i < prices.length; i++) {
+                returns.push((prices[i] - prices[i-1]) / prices[i-1]);
+            }
+            
+            // 통계 계산
+            const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+            const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / returns.length;
+            const volatility = Math.sqrt(variance);
+            
+            // 왜도 계산
+            const skewness = returns.reduce((a, b) => a + Math.pow((b - mean) / volatility, 3), 0) / returns.length;
+            
+            // 첨도 계산
+            const kurtosis = returns.reduce((a, b) => a + Math.pow((b - mean) / volatility, 4), 0) / returns.length - 3;
+            
+            // RSI 계산
+            const rsi = calculateRSI(prices);
+            
+            // 모멘텀 계산
+            const momentum = prices.length >= 5 ? 
+                (prices[prices.length - 1] - prices[prices.length - 5]) / prices[prices.length - 5] : 0;
+            
+            // 베이지안 업데이트
+            const params = studentTParams[selectedCrypto];
+            const volParams = invGammaParams[selectedCrypto];
+            
+            const posteriorLoc = (params.loc + mean) / 2;
+            const posteriorScale = params.scale * (1 + Math.abs(skewness) * 0.1);
+            
+            // 예측
+            const predictedReturn = sampleStudentT(params.df, posteriorLoc, posteriorScale);
+            const predictedVolatility = sampleInverseGamma(volParams.shape, volParams.scale);
+            
+            // RSI 조정
+            let adjustment = 1;
+            if (rsi > 70) adjustment = 0.95;
+            else if (rsi < 30) adjustment = 1.05;
+            
+            const lastPrice = currentPrice || prices[prices.length - 1];
+            const predictedPrice = lastPrice * (1 + predictedReturn * adjustment);
+            
+            const confidence = Math.max(0.6, Math.min(0.95, 1 - predictedVolatility * 10));
+            const upperBound = predictedPrice * (1 + 1.96 * posteriorScale);
+            const lowerBound = predictedPrice * (1 - 1.96 * posteriorScale);
+            
+            return {
+                price: predictedPrice,
+                upperBound,
+                lowerBound,
+                confidence,
+                statistics: {
+                    mean: (mean * 100).toFixed(2),
+                    volatility: (volatility * 100).toFixed(2),
+                    skewness: skewness.toFixed(3),
+                    kurtosis: kurtosis.toFixed(3)
+                },
+                indicators: {
+                    rsi: rsi.toFixed(1),
+                    momentum: (momentum * 100).toFixed(2),
+                    trend: momentum > 0 ? 'bullish' : 'bearish'
+                }
+            };
+        }
+
+        // UI 업데이트
+        function updateUI(prediction) {
+            if (!prediction) return;
+            
+            // 예측 가격
+            document.getElementById('predictedPrice').textContent = 
+                `$${prediction.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            
+            // 가격 변화
+            const priceChange = ((prediction.price - currentPrice) / currentPrice * 100).toFixed(2);
+            const changeElement = document.getElementById('priceChange');
+            changeElement.textContent = `${priceChange > 0 ? '+' : ''}${priceChange}%`;
+            changeElement.className = `text-sm font-semibold ${priceChange > 0 ? 'text-green-400' : 'text-red-400'}`;
+            
+            // 트렌드 아이콘
+            document.getElementById('trendIcon').textContent = priceChange > 0 ? '📈' : '📉';
+            
+            // 신뢰도
+            document.getElementById('confidence').textContent = (prediction.confidence * 100).toFixed(1);
+            
+            // 가격 범위
+            document.getElementById('priceRange').textContent = 
+                `범위: $${prediction.lowerBound.toFixed(2)} - $${prediction.upperBound.toFixed(2)}`;
+            
+            // 시장 트렌드
+            const trendElement = document.getElementById('marketTrend');
+            trendElement.textContent = prediction.indicators.trend === 'bullish' ? '상승세' : '하락세';
+            trendElement.className = `text-3xl font-bold ${prediction.indicators.trend === 'bullish' ? 'text-green-400' : 'text-red-400'}`;
+            
+            // RSI 상태
+            document.getElementById('rsiStatus').textContent = `RSI: ${prediction.indicators.rsi}`;
+            
+            // 통계
+            document.getElementById('meanReturn').textContent = `${prediction.statistics.mean}%`;
+            document.getElementById('meanReturn').className = `font-semibold ${parseFloat(prediction.statistics.mean) > 0 ? 'text-green-400' : 'text-red-400'}`;
+            document.getElementById('volatility').textContent = `${prediction.statistics.volatility}%`;
+            document.getElementById('skewness').textContent = prediction.statistics.skewness;
+            document.getElementById('kurtosis').textContent = prediction.statistics.kurtosis;
+            
+            // 기술적 지표
+            document.getElementById('rsiValue').textContent = prediction.indicators.rsi;
+            document.getElementById('rsiValue').className = `font-semibold ${
+                prediction.indicators.rsi > 70 ? 'text-red-400' : 
+                prediction.indicators.rsi < 30 ? 'text-green-400' : 'text-white'
+            }`;
+            
+            document.getElementById('momentum').textContent = `${prediction.indicators.momentum}%`;
+            document.getElementById('momentum').className = `font-semibold ${
+                parseFloat(prediction.indicators.momentum) > 0 ? 'text-green-400' : 'text-red-400'
+            }`;
+            
+            // 추세 강도
+            const strength = Math.min(100, Math.abs(parseFloat(prediction.indicators.momentum)) * 10);
+            const strengthBar = document.getElementById('trendStrength');
+            strengthBar.style.width = `${strength}%`;
+            strengthBar.className = `h-2 rounded-full transition-all ${
+                prediction.indicators.trend === 'bullish' ? 'bg-green-400' : 'bg-red-400'
+            }`;
+            
+            // 시장 상태
+            let marketStatus = '중립';
+            if (prediction.indicators.rsi > 70) marketStatus = '과매수';
+            else if (prediction.indicators.rsi < 30) marketStatus = '과매도';
+            document.getElementById('marketStatus').textContent = marketStatus;
+        }
+
+        // 현재 가격 업데이트
+        function updateCurrentPrice() {
+            document.getElementById('currentPrice').textContent = 
+                `$${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+
+        // 차트 업데이트
+        function updateChart(prediction) {
+            const labels = priceData.map(d => d.date);
+            const prices = priceData.map(d => d.price);
+            
+            // 예측 데이터 추가
+            labels.push('예측');
+            const predictedPrices = new Array(prices.length).fill(null);
+            predictedPrices.push(prediction.price);
+            
+            // 신뢰구간 - 마지막 실제 가격부터 연결
+            const upperBounds = new Array(prices.length - 1).fill(null);
+            upperBounds.push(prices[prices.length - 1]); // 마지막 실제 가격
+            upperBounds.push(prediction.upperBound); // 예측 상한
+            
+            const lowerBounds = new Array(prices.length - 1).fill(null);
+            lowerBounds.push(prices[prices.length - 1]); // 마지막 실제 가격
+            lowerBounds.push(prediction.lowerBound); // 예측 하한
+            
+            if (chart) {
+                chart.data.labels = labels;
+                chart.data.datasets[0].data = prices;
+                chart.data.datasets[1].data = predictedPrices;
+                chart.data.datasets[2].data = upperBounds;
+                chart.data.datasets[3].data = lowerBounds;
+                chart.update();
+            } else {
+                const ctx = document.getElementById('priceChart').getContext('2d');
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '실제 가격',
+                            data: prices,
+                            borderColor: '#EF4444',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#EF4444',
+                            spanGaps: false
+                        }, {
+                            label: '예측 가격',
+                            data: predictedPrices,
+                            borderColor: '#3B82F6',
+                            backgroundColor: 'transparent',
+                            borderWidth: 3,
+                            borderDash: [5, 5],
+                            pointRadius: 6,
+                            pointBackgroundColor: '#3B82F6',
+                            spanGaps: false
+                        }, {
+                            label: '신뢰구간 상한',
+                            data: upperBounds,
+                            borderColor: 'rgba(59, 130, 246, 0.5)',
+                            backgroundColor: 'transparent',
+                            borderWidth: 1,
+                            borderDash: [3, 3],
+                            pointRadius: 0,
+                            spanGaps: true,
+                            fill: false
+                        }, {
+                            label: '신뢰구간 하한',
+                            data: lowerBounds,
+                            borderColor: 'rgba(59, 130, 246, 0.5)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 1,
+                            borderDash: [3, 3],
+                            pointRadius: 0,
+                            spanGaps: true,
+                            fill: '-1' // 이전 데이터셋(상한)까지 채우기
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: '#9CA3AF',
+                                    filter: function(item, chart) {
+                                        // 예측 가격과 실제 가격만 범례에 표시
+                                        return item.text === '실제 가격' || item.text === '예측 가격';
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += '
+
+        // 에러 표시
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.querySelector('span').textContent = message;
+            errorDiv.classList.remove('hidden');
+            setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+        }
+
+        // 데이터 로드
+        async function loadData() {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('mainContent').classList.add('hidden');
+            
+            priceData = await fetchHistoricalData();
+            if (priceData.length > 0) {
+                const price = await fetchCurrentPrice();
+                if (price) currentPrice = price;
+                
+                updateCurrentPrice();
+                
+                const prediction = bayesianPredict();
+                if (prediction) {
+                    updateUI(prediction);
+                    updateChart(prediction);
+                }
+                
+                // 시간대별 예측 계산
+                await calculateIntradayPredictions();
+                
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('mainContent').classList.remove('hidden');
+                
+                connectWebSocket();
+            }
+        }
+
+        // 주기적 예측 업데이트
+        setInterval(() => {
+            if (priceData.length > 0) {
+                const prediction = bayesianPredict();
+                if (prediction) {
+                    updateUI(prediction);
+                    updateChart(prediction);
+                }
+            }
+        }, 5000);
+
+        // 시간대별 예측 주기적 업데이트 (1분마다)
+        setInterval(() => {
+            calculateIntradayPredictions();
+        }, 60000);
+
+        // 초기 로드
+        loadData();
+    </script>
+</body>
+</html> + context.parsed.y.toLocaleString('en-US', {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2
+                                            });
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                ticks: {
+                                    color: '#9CA3AF',
+                                    callback: function(value) {
+                                        return '
+
+        // 에러 표시
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.querySelector('span').textContent = message;
+            errorDiv.classList.remove('hidden');
+            setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+        }
+
+        // 데이터 로드
+        async function loadData() {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('mainContent').classList.add('hidden');
+            
+            priceData = await fetchHistoricalData();
+            if (priceData.length > 0) {
+                const price = await fetchCurrentPrice();
+                if (price) currentPrice = price;
+                
+                updateCurrentPrice();
+                
+                const prediction = bayesianPredict();
+                if (prediction) {
+                    updateUI(prediction);
+                    updateChart(prediction);
+                }
+                
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('mainContent').classList.remove('hidden');
+                
+                connectWebSocket();
+            }
+        }
+
+        // 주기적 예측 업데이트
+        setInterval(() => {
+            if (priceData.length > 0) {
+                const prediction = bayesianPredict();
+                if (prediction) {
+                    updateUI(prediction);
+                    updateChart(prediction);
+                }
+            }
+        }, 5000);
+
+        // 초기 로드
+        loadData();
+    </script>
+</body>
+</html> + value.toLocaleString();
+                                    }
+                                },
+                                grid: {
+                                    color: '#374151'
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    color: '#9CA3AF'
+                                },
+                                grid: {
+                                    color: '#374151'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // 에러 표시
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.querySelector('span').textContent = message;
+            errorDiv.classList.remove('hidden');
+            setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+        }
+
+        // 데이터 로드
+        async function loadData() {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('mainContent').classList.add('hidden');
+            
+            priceData = await fetchHistoricalData();
+            if (priceData.length > 0) {
+                const price = await fetchCurrentPrice();
+                if (price) currentPrice = price;
+                
+                updateCurrentPrice();
+                
+                const prediction = bayesianPredict();
+                if (prediction) {
+                    updateUI(prediction);
+                    updateChart(prediction);
+                }
+                
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('mainContent').classList.remove('hidden');
+                
+                connectWebSocket();
+            }
+        }
+
+        // 주기적 예측 업데이트
+        setInterval(() => {
+            if (priceData.length > 0) {
+                const prediction = bayesianPredict();
+                if (prediction) {
+                    updateUI(prediction);
+                    updateChart(prediction);
+                }
+            }
+        }, 5000);
+
+        // 초기 로드
+        loadData();
+    </script>
+</body>
+</html>
